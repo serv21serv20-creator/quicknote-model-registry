@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "providers": {
+    "groq": {
+      "prefer": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
+      "deny": ["llama3-8b-8192"],
+      "default_temperature": 0.1
+    },
+    "gemini": {
+      "prefer": ["gemini-2.0-flash", "gemini-2.0-pro"],
+      "deny": ["gemini-1.5-flash"],
+      "default_temperature": 0.3
+    }
+  },
+  "refresh_seconds": 86400
+}
