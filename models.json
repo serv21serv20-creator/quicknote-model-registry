@@ -1,16 +1,25 @@
 {
-  "version": 1,
+  "version": "2025-10-15",
   "providers": {
     "groq": {
-      "prefer": ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
-      "deny": ["llama3-8b-8192"],
-      "default_temperature": 0.1
+      "base_url": "https://api.groq.com/openai/v1",
+      "models": [
+        { "id": "llama-3.1-70b-versatile", "role": "summary", "status": "stable", "priority": 1 },
+        { "id": "llama-3.1-8b-instant",     "role": "summary", "status": "stable", "priority": 2 }
+      ]
     },
     "gemini": {
-      "prefer": ["gemini-2.0-flash", "gemini-2.0-pro"],
-      "deny": ["gemini-1.5-flash"],
-      "default_temperature": 0.3
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "models": [
+        { "id": "gemini-1.5-pro",    "role": "summary", "status": "stable", "priority": 1 },
+        { "id": "gemini-1.5-flash",  "role": "summary", "status": "stable", "priority": 2 }
+      ]
     }
   },
-  "refresh_seconds": 86400
+  "defaults": {
+    "summary": [
+      { "provider": "groq",   "model": "llama-3.1-70b-versatile" },
+      { "provider": "gemini", "model": "gemini-1.5-pro" }
+    ]
+  }
 }
