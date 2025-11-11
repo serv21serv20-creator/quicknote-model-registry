@@ -1,0 +1,94 @@
+name: Refresh Models Registry (Daily)
+
+on:
+  schedule:
+    - cron: "17 2 * * *"    # يوميًا 02:17 UTC (05:17 بغداد)
+  workflow_dispatch:        # تشغيل يدويًا
+
+permissions:
+  contents: write           # ضروري لدفع commit
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Debug dump (safe)
+        run: |
+          set -e
+          echo "Python version:"
+          python --version
+          echo "Repo root:"
+          pwd
+          echo "List root dir:"
+          ls -la
+          echo "Has build_models_json.py?"
+          test -f build_models_json.py && echo "YES" || (echo "NO (this will cause failure)"; exit 2)
+          echo "Has models.json?"
+          test -f models.json && echo "YES" || echo "NO (will be created if missing)"
+          echo "Secrets presence (length only, masked):"
+          if [ -n "${{ secrets.GROQ_API_KEY }}" ]; then echo "GROQ_API_KEY: present"; else echo "GROQ_API_KEY: MISSING"; fi
+          if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then echo "GEMINI_API_KEY: present"; else echo "GEMINI_API_KEY: MISSING"; fi
+
+      - name: Build models.json (robust)
+        id: build_step
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -e
+          echo "Running build_models_json.py ..."
+          # نشغّل السكربت مع تتبّع للأخطاء
+          python build_models_json.py && STATUS=ok || STATUS=fail
+          echo "BUILD_STATUS=${STATUS}" >> $GITHUB_OUTPUT
+          if [ "$STATUS" = "fail" ]; then
+            echo "::warning:: build_models_json.py failed. Will write a safe fallback models.json"
+            cat > models.json <<'JSON'
+{
+  "version": "fallback",
+  "providers": {
+    "groq": {
+      "prefer": ["llama-3.1-70b-versatile", "llama-3.1-8b-instant"],
+      "deny": [],
+      "default_temperature": 0.1
+    },
+    "gemini": {
+      "prefer": ["gemini-1.5-pro", "gemini-1.5-flash"],
+      "deny": [],
+      "default_temperature": 0.3
+    }
+  },
+  "refresh_seconds": 86400
+}
+JSON
+          fi
+          echo "models.json after build/fallback:"
+          ls -l models.json
+          head -n 40 models.json || true
+
+      - name: Show diff
+        run: |
+          git status
+          git diff -- models.json || true
+
+      - name: Commit & push if changed
+        run: |
+          set -e
+          if ! git diff --quiet --exit-code -- models.json; then
+            git config user.name  "actions-bot"
+            git config user.email "actions-bot@users.noreply.github.com"
+            git add models.json
+            git commit -m "chore(models): daily refresh $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+            git push
+          else
+            echo "No changes in models.json; skipping commit."
+          fi
